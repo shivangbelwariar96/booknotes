@@ -1,5 +1,8 @@
 # Proximity Service
 
+WATCH THIS: 
+https://youtu.be/M4lR_Va97cQ?si=NcwcL209fc2_pm25
+
 A proximity service enables you to discover nearby places such as restaurants, hotels, theatres, etc.
 
 # Step 1 - Understand the problem and establish design scope
