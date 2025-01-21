@@ -1,3 +1,6 @@
+https://youtu.be/iJLL-KPqBpM?si=IbNp3jGEfR6p8znA
+
+
 # Distributed Message Queue
 We'll be designing a distributed message queue in this chapter.
 
