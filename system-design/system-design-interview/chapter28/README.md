@@ -75,6 +75,54 @@ Finally, a wallet service is a stateless service responsible for carrying out tr
 
 Although this solution addresses scalability concerns, it doesn't allow us to execute balance transfers atomically.
 
+
+
+
+Chatgpt Explanation-------------------------------
+Here’s a simplified explanation of the solution:
+	1.	What does the wallet application do?
+It keeps track of how much money (balance) every user has in their account.
+	2.	How do we store this data?
+A simple way is to use a key-value map, where:
+	•	The key is the user ID (e.g., “User123”).
+	•	The value is their account balance (e.g., $100).
+We can use an in-memory Redis store to hold this map, as Redis is fast.
+	3.	Why do we need multiple Redis nodes?
+If we have a lot of users and very high activity (like 1 million transactions per second), a single Redis node can’t handle it.
+So, we divide the data across multiple Redis nodes (this is called partitioning or sharding).
+	4.	How do we decide which Redis node stores data for a user?
+We use a partitioning algorithm:
+	•	Take the user ID (e.g., “User123”).
+	•	Calculate a hash value from it.
+	•	Use the hash value to determine which partition (Redis node) will store this user’s data.
+For example:
+partition = hash(userID) % numberOfPartitions
+	5.	How do we keep track of partitions and nodes?
+We use Zookeeper, a reliable system for storing configuration data, to:
+	•	Record the number of partitions.
+	•	Store the addresses of the Redis nodes.
+	6.	What does the wallet service do?
+The wallet service is a stateless service that:
+	•	Handles money transfers between accounts.
+	•	Scales easily because it doesn’t store any user data itself.
+	7.	What’s the challenge?
+While this setup handles high traffic and scales well, it cannot perform atomic balance transfers.
+For example, if a user transfers money to another user, their balances might be on different Redis nodes. Ensuring both updates happen together (or not at all) is difficult without additional mechanisms.
+
+In short:
+	•	The system splits the workload across multiple Redis nodes to handle high traffic.
+	•	A hashing algorithm decides where each user’s balance is stored.
+	•	Zookeeper manages the configuration.
+	•	The wallet service processes transfers but cannot guarantee atomicity of multi-node operations without extra steps.
+----------------------------------------------------
+
+
+
+
+
+
+
+
 ## Distributed transactions
 One approach for handling transactions is to use the two-phase commit protocol on top of standard, sharded relational databases:
 ![distributed-transactions-relational-dbs](images/distributed-transactions-relational-dbs.png)
@@ -89,6 +137,57 @@ Here's how the two-phase commit (2PC) protocol works:
 Downsides to the 2PC approach:
  * Not performant due to lock contention
  * The coordinator is a single point of failure
+
+
+
+Chatgpt Explanation ----------------------------------------
+Here’s a simple explanation of distributed transactions and the two-phase commit (2PC) protocol:
+
+What’s the goal?
+
+When handling money transfers, the system needs to make sure that updates to multiple databases either:
+	1.	Happen together (success), or
+	2.	Don’t happen at all (failure).
+
+For example:
+	•	If User A sends $50 to User B, we need to:
+	•	Deduct $50 from User A’s balance in one database.
+	•	Add $50 to User B’s balance in another database.
+	•	Both updates must succeed, or neither should happen. This ensures no money is “lost” or “created.”
+
+How does the 2PC protocol work?
+
+The Two-Phase Commit (2PC) is a process for handling these multi-database transactions.
+	1.	Phase 1: Prepare
+	•	The coordinator (e.g., the wallet service) tells all databases involved in the transaction to prepare for it.
+	•	Each database checks if it can make the change and locks the data so no one else can modify it.
+	•	If the database is ready, it replies with “yes.” If not, it says “no.”
+	2.	Phase 2: Commit or Abort
+	•	If all databases reply “yes”, the coordinator tells them to commit the changes (finalize them).
+	•	If any database says “no”, the coordinator tells all databases to abort (cancel) the transaction.
+
+What are the problems with 2PC?
+	1.	Performance Issues (Lock Contention):
+	•	During the “prepare” phase, databases lock the data being updated to make sure no one else can modify it.
+	•	This locking slows down the system, especially when there are many transactions happening at once.
+	2.	Single Point of Failure:
+	•	The coordinator controls the entire process.
+	•	If the coordinator crashes in the middle of a transaction, the system might get stuck, and no one will know whether to commit or abort the transaction.
+
+Summary in Simple Terms
+
+The two-phase commit protocol ensures that either all databases succeed or none of them do, keeping data consistent.
+However, it has two major downsides:
+	•	It’s slow because databases lock data while waiting for decisions.
+	•	It’s risky because if the coordinator fails, everything is stuck.
+---------------------------------------------------------------
+
+
+
+
+
+
+
 
 ## Distributed transaction using Try-Confirm/Cancel (TC/C)
 TC/C is a variation of the 2PC protocol, which works with compensating transactions:
@@ -162,6 +261,78 @@ One edge-case to address is out of order execution:
 It is possible that a database receives a cancel operation, before receiving a try. This edge case can be handled by adding an out of order flag in our phase status table.
 When we receive a try operation, we first check if the out of order flag is set and if so, a failure is returned.
 
+
+Chatgpt Explanation-------------------------------
+
+Here’s a simple explanation of Try-Confirm/Cancel (TC/C) for handling distributed transactions:
+
+What’s the goal?
+
+Like 2PC, the goal of TC/C is to ensure that changes to multiple databases are consistent, meaning either:
+	1.	All the changes succeed, or
+	2.	They are rolled back properly.
+
+However, TC/C takes a different approach to make it more flexible and less prone to locking issues.
+
+How does TC/C work?
+
+TC/C breaks the process into two phases with independent transactions. Instead of locking resources like in 2PC, TC/C uses “reserve first, finalize later” logic. Here’s how it works:
+
+Phase 1: Try (Reserve Resources)
+	•	The coordinator asks each database to reserve resources for the transaction.
+	•	Example for a transfer:
+	•	User A’s database: Temporarily deduct $1 (reserve it).
+	•	User C’s database: Do nothing (no operation, or NOP).
+	•	If all databases reply “yes,” we move to the next phase. If any reply “no,” we cancel.
+
+Phase 2a: Confirm (Success)
+	•	If all databases said “yes,” the transaction is finalized:
+	•	User A’s database: Do nothing (A’s balance is already reduced).
+	•	User C’s database: Add $1 to C’s balance (finalizing the transfer).
+
+Phase 2b: Cancel (Failure)
+	•	If any database said “no” during Phase 1, the transaction is canceled:
+	•	User A’s database: Add $1 back (undo the reservation).
+	•	User C’s database: Do nothing (because nothing was done in Phase 1).
+
+Key Differences Between TC/C and 2PC
+
+Aspect	2PC	TC/C
+First Phase	Transactions are not finalized yet	Transactions are temporarily completed (reserved or canceled).
+Second Phase: Success	Commit all changes	Finalize changes using new transactions.
+Second Phase: Fail	Cancel all changes	Reverse the already completed changes.
+
+Advantages of TC/C
+	1.	Database-Agnostic: Works with any database that supports transactions.
+	2.	No Long Locks: Unlike 2PC, it avoids locking resources for long periods, improving performance.
+	3.	Flexibility: Relies on the business logic to handle retries or failures.
+
+Challenges of TC/C
+	1.	Complexity: The application (business logic) has to manage compensating transactions and handle failures explicitly.
+	2.	Latency: Since TC/C involves multiple independent transactions, it might take slightly longer than 2PC.
+	3.	Risk of Partial Changes: If the system crashes during the process, partial updates might occur unless properly handled.
+
+Example in Simple Terms
+
+Imagine User A wants to send $1 to User C:
+	1.	Phase 1: Try
+	•	Deduct $1 from User A’s account (reserve it).
+	•	Do nothing for User C yet.
+	2.	Phase 2a: Confirm (if success)
+	•	Keep $1 deducted from User A.
+	•	Add $1 to User C’s account.
+	3.	Phase 2b: Cancel (if failure)
+	•	Add $1 back to User A’s account (undo the reservation).
+	•	Do nothing for User C.
+
+In short, TC/C splits the process into small steps and handles failures by undoing or compensating for earlier steps. This avoids locking resources for long periods and makes it more adaptable for distributed systems.
+
+----------------------------------------------------
+
+
+
+
+
 ## Distributed transaction using Saga
 Another popular approach is using Sagas - a standard for implementing distributed transactions with microservice architectures.
 
@@ -191,6 +362,88 @@ Here's a comparison between TC/C and Saga:
 The main difference is that TC/C is parallelizable, so our decision is based on the latency requirement - if we need to achieve low latency, we should go for the TC/C approach.
 
 Regardless of the approach we take, we still need to support auditing and replaying history to recover from failed states.
+
+
+
+Chatgpt Explanation-----------------------------
+
+Here’s a simple explanation of Sagas for distributed transactions and how they compare to other approaches:
+
+What is a Saga?
+
+A Saga is a way to handle distributed transactions where all the operations are executed step by step in a sequence. Each step is independent and works on its own database.
+	•	If all steps succeed: The transaction is completed successfully.
+	•	If any step fails: The system goes backward, undoing the previous steps using compensating actions (rollbacks).
+
+How Sagas Work
+
+Imagine transferring $1 from User A to User C:
+	1.	Step 1: Deduct $1 from User A’s balance (A’s database).
+	2.	Step 2: Add $1 to User C’s balance (C’s database).
+
+If Step 2 fails, the system rolls back by:
+	•	Compensating Step 1: Adding $1 back to User A’s balance.
+
+How Do We Coordinate Sagas?
+
+There are two main ways to organize the workflow:
+
+1. Choreography (Event-Driven)
+	•	Each service listens for specific events and performs its part of the process when triggered.
+	•	Example:
+	•	Step 1: Deduct $1 from User A. Emit an event: “Money Deducted.”
+	•	Step 2: C’s service listens to the “Money Deducted” event and adds $1 to User C.
+	•	Challenge: Business logic is spread across services, making it harder to manage and debug.
+
+2. Orchestration (Central Coordinator)
+	•	A single Saga Coordinator controls the process and instructs services to act in order.
+	•	Example:
+	•	The coordinator tells A’s service: “Deduct $1.”
+	•	Then it tells C’s service: “Add $1.”
+	•	Preferred for Wallet Systems: Easier to manage and debug because all logic is centralized.
+
+Comparison: TC/C vs. Saga
+
+Aspect	TC/C	Saga
+Rollback (Compensation)	In Cancel phase	In rollback phase
+Central Coordinator	Yes	Yes (orchestration mode)
+Operation Order	Any	Linear (one step at a time)
+Parallel Execution	Yes	No (steps are sequential)
+Temporary Inconsistencies	Yes	Yes
+Logic Location	In the application	In the application
+
+When Should You Use Sagas?
+	•	Use Sagas if operations must be executed in a strict order, step by step.
+	•	Use TC/C if you need low latency and operations can run in parallel.
+
+Key Points About Sagas
+	1.	Simple to Understand: Operations happen one after another, and failures trigger compensating steps.
+	2.	Orchestration is Better for Complex Systems: A central controller keeps things organized.
+	3.	No Locks Needed: Unlike 2PC, Sagas don’t lock resources, so they scale well for microservices.
+	4.	Audit and Replay Support: Keep a history of operations to recover from failures or inconsistencies.
+
+Summary in Simple Terms (Continued)
+	•	Sagas handle distributed transactions by executing steps in order and rolling back if something fails.
+	•	They are flexible, scalable, and avoid long locks like 2PC, making them ideal for microservices-based systems.
+	•	Orchestration is the preferred coordination method because a single controller simplifies management.
+	•	While they work well for sequential operations, they are slower than TC/C if steps cannot run in parallel.
+
+How to Decide Between TC/C and Saga?
+	•	Choose TC/C if:
+	•	Low latency is critical.
+	•	Operations can run in parallel (e.g., updating multiple accounts simultaneously).
+	•	Choose Saga if:
+	•	Operations must happen in a strict sequence.
+	•	You want a simpler, more scalable solution for microservices.
+
+Both approaches require:
+	•	Auditing to track the steps taken.
+	•	Replaying history to recover from failures and ensure the system stays consistent.
+
+In summary, Sagas provide a robust, scalable way to handle transactions in a distributed system, especially when a step-by-step approach fits the business needs. However, the trade-off is higher latency compared to methods like TC/C when parallel execution is an option.
+
+---------------------------------------------------
+
 
 ## Event sourcing
 In real-life, a digital wallet application might be audited and we have to answer certain questions:
