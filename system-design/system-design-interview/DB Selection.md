@@ -1,3 +1,19 @@
+| Data Type     | Size (in Bytes)      | Range (for Signed Types)                                      |
+|--------------|-------------------|------------------------------------------------|
+| `char`       | 1                 | -128 to 127 (`signed`), 0 to 255 (`unsigned`)  |
+| `short`      | 2                 | -32,768 to 32,767                             |
+| `int`        | 4                 | -2,147,483,648 to 2,147,483,647               |
+| `long`       | 4 (32-bit) / 8 (64-bit) | Same as `int` (32-bit) / Larger range (64-bit) |
+| `long long`  | 8                 | -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807 |
+| `float`      | 4                 | ~3.4 × 10⁻³⁸ to 3.4 × 10³⁸                   |
+| `double`     | 8                 | ~1.7 × 10⁻³⁰⁸ to 1.7 × 10³⁰⁸                 |
+| `long double`| 8, 12, or 16 (depends on system) | Larger precision than `double` |
+| `bool`       | 1                 | `true` (1) or `false` (0)                     |
+| `void*` (pointer) | 4 (32-bit) / 8 (64-bit) | Stores memory addresses              |
+
+
+
+
 | System Design                        | Primary DB Choice / Tech Stack                                     | Database Type                                   | Primary Reason                                        | Additional Details / Alternatives |
 |--------------------------------------|------------------------------------------------------------------|------------------------------------------------|-------------------------------------------------|-----------------------------------|
 | API Rate Limiter / Rate Limiter       | Redis or Redis Cluster                                          | NoSQL (In‑memory key‑value store)              | Ultra‑low latency with atomic counter operations and built‑in expiration | Alternatives: Memcached (if atomic counters aren’t needed) or other in‑memory stores with TTL support. |
