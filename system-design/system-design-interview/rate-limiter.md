@@ -4,7 +4,7 @@
 |----------------------------------------------|----------------------------------|-----------------------------------|----------------------------------|----------------------------------------------------------|
 | Total Users                                  | 2B                               | 1.5B                              | 500M                             | Public user estimates                                    |
 | Daily Active Users (DAU)                     | ~1B                              | ~1B                               | ~300M                            | Estimated 50-70% of total users active daily              |
-| Avg. API Requests/User/Day                   | ~10K requests                    | ~5K requests                      | ~3K requests                     | API-heavy applications require frequent rate limiting    |
+| Avg. API Requests/User/Day                   | ~10 requests                    | ~5 requests                      | ~3 requests                     | API-heavy applications require frequent rate limiting    |
 | Total Requests/Day                           | ~10B                             | ~5B                               | ~2B                              | DAU × Avg. Requests/User                                 |
 | Avg. Rate Limit (RPS/user)                    | 100-1000 RPS                     | 50-500 RPS                        | 10-100 RPS                       | Application-specific API rate limits                     |
 
