@@ -70,6 +70,11 @@ Breakdown of the different sections:
  * Datacenter ID - 5 bits, which enables 32 data centers max.
  * Machine ID - 5 bits, which enables 32 machines per data center.
  * Sequence number - For every generated ID, the sequence number is incremented. Reset to 0 on every millisecond.
+ * When multiple requests arrive at the same millisecond on the same machine, each thread atomically increments the     sequence number, ensuring uniqueness. If the sequence exceeds 4095, the system waits until the next millisecond before generating more IDs. Thread safety is ensured using atomic counters or locks, allowing only one thread at a time to increment the sequence number. This prevents race conditions and ensures unique ID generation.
+ * What Happens If More Than 4096 Requests Arrive in One Millisecond?
+    If more than 4096 requests are made within the same millisecond on a single machine:
+    The Snowflake system waits until the next millisecond before generating the next ID.
+    This prevents duplicates but may introduce a slight delay.
 
 # Step 3 - Design deep dive
 We'll use twitter's snowflake algorithm as it fits our needs best.
