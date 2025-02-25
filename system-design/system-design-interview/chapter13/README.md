@@ -115,6 +115,16 @@ Here's our refined high-level design:
  * Key-value store is used for storing chat history. When offline user goes online, they will see their chat history and missed messages.
 
 ### Storage
+
+NOTE: 
+you can store the locally & on server both
+
+### 1. **Relational Database (RDBMS)**:
+- **SQLite**: On the client side, WhatsApp uses SQLite, a lightweight, relational database management system. SQLite is embedded within the WhatsApp application on the user's device and is used to store conversations locally. This ensures that messages are readily available without the need to download them from the server every time the app is opened.
+
+### 2. **NoSQL Database**:
+- **Mnesia**: On the server side, WhatsApp uses Mnesia, an Erlang-based distributed database management system. Mnesia is a NoSQL database that provides real-time key/value lookup, high fault tolerance, dynamic reconfiguration, and the ability to handle complex objects. Mnesia is well-suited for storing data and temporary messages due to its scalability and integration with Erlang, the primary programming language used in WhatsApp's backend infrastructure.
+
 One important decision for the storage/data layer is whether we should go with a SQL or NoSQL database.
 
 To make the decision, we need to examine the read/write access patterns.
