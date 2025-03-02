@@ -104,6 +104,21 @@ Pros:
 Cons:
  * Parameters might be challenging to tune properly
 
+In the context of a "Token Bucket" rate limiter, a queue is not typically used to manage the tokens themselves. Instead, the token bucket algorithm usually relies on a counter and a timestamp to track the number of available tokens and the rate at which tokens are added to the bucket. Here's a breakdown of how it works:
+
+Token Counter: A counter is used to keep track of the number of tokens currently available in the bucket. Each token represents a permitted request.
+
+Token Refill Rate: Tokens are added to the bucket at a fixed rate (e.g., one token per second). This rate determines how quickly the bucket refills after tokens are consumed.
+
+Timestamp: A timestamp is used to track the last time the bucket was refilled. This allows the system to calculate how many tokens should be added based on the elapsed time.
+
+Request Handling: When a request arrives, the system checks if there are enough tokens in the bucket. If there are, a token is consumed, and the request is allowed. If not, the request is rate-limited (e.g., delayed or rejected).
+
+
+
+
+
+
 ### Leaking bucket algorithm
 Similar to token bucket algorithm, but requests are processed at a fixed rate.
 
