@@ -144,6 +144,9 @@ FOREIGN KEY (short_url_id) REFERENCES ShortenedURLs(id)
 
 
 
+
+
+
 # Chapter 10 - Design A Web Crawler
 
 A Web Crawler systematically browses the World Wide Web, typically for the purpose of Web indexing.
@@ -216,6 +219,9 @@ NoSQL is beneficial for handling large volumes of URLs, crawled content, and fle
 
 
 
+
+
+
 # Chapter 11 - Design A Notification System
 
 A Notification System delivers real-time notifications to users across various channels.
@@ -276,6 +282,14 @@ A Notification System delivers real-time notifications to users across various c
 
 ---
 
+
+
+
+
+
+
+
+
 # Chapter 12 - Design A News Feed System
 
 A News Feed System displays relevant and personalized content to users, typically in a chronological or ranked order.
@@ -321,6 +335,9 @@ A News Feed System displays relevant and personalized content to users, typicall
 | created_at       | Timestamp |
 
 ---
+
+
+
 
 
 
@@ -656,6 +673,62 @@ FOREIGN KEY (channel_user_id) REFERENCES Users(user_id)
 
 
 
+# Chapter 17 - Proximity Service (Reiteration for Completeness)
+
+A **Proximity Service** helps users find resources or other users within a geographical area.
+
+## Services
+
+| Service Name          | Description                                              |
+|----------------------|------------------------------------------------------|
+| `getNearbyPlaces`   | Retrieves a list of places of interest near a location. |
+| `getNearbyUsers`    | Retrieves a list of users near a location.            |
+| `registerPlace`     | Allows businesses or individuals to register a place.  |
+| `updatePlaceLocation` | Updates the location of a registered place.           |
+| `searchPlaces`      | Searches for places based on keywords and location.    |
+
+## API Details & Schemas
+
+| Service Name         | Req Type | API URL                                 | Request JSON Schema                                                                                     | Response JSON Schema                                                                    |
+|----------------------|---------|-----------------------------------------|-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `getNearbyPlaces`   | GET     | `/api/v1/proximity/places/nearby`      | `{ "latitude": number, "longitude": number, "radius_km": number, "category": "string (optional)", "page": integer, "per_page": integer }` | `{ "places": [{}], "total_places": integer, "page": integer, "total_pages": integer }` |
+| `getNearbyUsers`    | GET     | `/api/v1/proximity/users/nearby`       | `{ "latitude": number, "longitude": number, "radius_km": number, "user_category": "string (optional)", "page": integer, "per_page": integer }` | `{ "users": [{}], "total_users": integer, "page": integer, "total_pages": integer }` |
+| `registerPlace`     | POST    | `/api/v1/proximity/place/register`     | `{ "place_name": "string", "latitude": number, "longitude": number, "category": "string", "description": "string", "contact_info": {} }` | `{ "place_id": "string", "status": "string" }` |
+| `updatePlaceLocation` | PUT     | `/api/v1/proximity/place/location`      | `{ "place_id": "string", "latitude": number, "longitude": number }`                                   | `{ "status": "string" }` |
+| `searchPlaces`      | GET     | `/api/v1/proximity/places/search`      | `{ "query": "string", "latitude": number, "longitude": number, "radius_km": number, "page": integer, "per_page": integer }` | `{ "places": [{}], "total_places": integer, "page": integer, "total_pages": integer }` |
+
+## Database: PostGIS Extension for PostgreSQL
+
+### PostgreSQL Tables (with PostGIS Extension)
+
+#### Places Table
+
+| Column Name    | Data Type                 | Primary Key | Foreign Key | Indexes                    |
+|---------------|--------------------------|-------------|-------------|----------------------------|
+| `place_id`    | VARCHAR(255)              | YES         |             |                            |
+| `place_name`  | VARCHAR(255)              | NO          |             |                            |
+| `category`    | VARCHAR(255)              | NO          |             | Index on `category`        |
+| `description` | TEXT                       | NO          |             |                            |
+| `contact_info`| JSONB                      | NO          |             |                            |
+| `location`    | GEOGRAPHY(POINT, 4326)    | NO          |             | GIST Index on `location`   |
+| `created_at`  | TIMESTAMP                  | NO          |             |                            |
+| `updated_at`  | TIMESTAMP                  | NO          |             |                            |
+
+#### Users Table (if needed for nearby users)
+
+| Column Name             | Data Type               | Primary Key | Foreign Key | Indexes                         |
+|------------------------|------------------------|-------------|-------------|---------------------------------|
+| `user_id`             | VARCHAR(255)           | YES         |             |                                 |
+| `username`            | VARCHAR(255)           | NO          |             | UNIQUE Index on `username`     |
+| `user_category`       | VARCHAR(255)           | NO          |             | Index on `user_category`       |
+| `last_location`       | GEOGRAPHY(POINT, 4326) | NO          |             | GIST Index on `last_location`  |
+| `last_location_update` | TIMESTAMP              | NO          |             |                                 |
+
+
+
+
+
+
 
 
 
@@ -719,6 +792,8 @@ A Nearby Friends feature allows users to discover friends who are geographically
 
 
 
+
+
 # Chapter 19 - Google Maps
 
 Design a map and navigation service like Google Maps. This is a very broad topic, focusing on core functionalities.
@@ -760,6 +835,115 @@ Design a map and navigation service like Google Maps. This is a very broad topic
 | category      | VARCHAR(255)  | NO          |             | Index on category |
 | location      | GEOGRAPHY(POINT, 4326) | NO  |             | GIST Index on location |
 
-This markdown format ensures proper structuring and readability for GitHub.
+
+
+
+
+
+
+# Chapter 23 - Hotel Reservation System
+
+A Hotel Reservation System allows users to search for, book, and manage hotel reservations.
+
+## Services
+
+| Service Name         | Description                                      |
+|----------------------|--------------------------------------------------|
+| searchHotels        | Searches for available hotels based on criteria. |
+| getHotelDetails     | Retrieves detailed information about a specific hotel. |
+| makeReservation     | Creates a new hotel reservation.                 |
+| cancelReservation   | Cancels an existing reservation.                  |
+| getUserReservations | Retrieves a user's reservation history.          |
+| getRoomAvailability | Checks room availability for a hotel and date range. |
+| addHotel           | Allows admin to add new hotels to the system.     |
+| updateHotelInfo    | Allows admin to update hotel information.         |
+| manageRoomTypes    | Allows admin to manage room types for hotels.     |
+
+## API Details & Schemas
+
+| Service Name         | Req Type | API URL | Request JSON Schema | Response JSON Schema |
+|----------------------|---------|---------|---------------------|----------------------|
+| searchHotels        | GET     | `/api/v1/hotel_reservation/hotels/search` | `{ "city": "string", "check_in_date": "date (YYYY-MM-DD)", "check_out_date": "date (YYYY-MM-DD)", "num_guests": integer, "amenities": ["string (optional)"], "price_range_min": number (optional), "price_range_max": number (optional), "page": integer, "per_page": integer }` | `{ "hotels": [{}], "total_hotels": integer, "page": integer, "total_pages": integer }` |
+| getHotelDetails     | GET     | `/api/v1/hotel_reservation/hotel/{hotel_id}` | `{}` | `{ "hotel_id": "string", "hotel_name": "string", "address": "string", "city": "string", "description": "string", "amenities": ["string"], "room_types": [{}], "rating": number, "photos": ["string"] }` |
+| makeReservation     | POST    | `/api/v1/hotel_reservation/reservation/make` | `{ "user_id": "string", "hotel_id": "string", "room_type_id": "string", "check_in_date": "date (YYYY-MM-DD)", "check_out_date": "date (YYYY-MM-DD)", "num_guests": integer, "guest_details": [{ "name": "string", "contact_number": "string" }] }` | `{ "reservation_id": "string", "status": "string", "confirmation_number": "string" }` |
+| cancelReservation   | POST    | `/api/v1/hotel_reservation/reservation/cancel` | `{ "reservation_id": "string", "user_id": "string" }` | `{ "reservation_id": "string", "status": "string", "cancellation_confirmation": "string", "refund_amount": number (optional) }` |
+| getUserReservations | GET     | `/api/v1/hotel_reservation/reservations/user/{user_id}` | `{ "page": integer, "per_page": integer, "status_filter": "active" "cancelled" }` | ... |
+| getRoomAvailability | GET     | `/api/v1/hotel_reservation/room_availability` | `{ "hotel_id": "string", "room_type_id": "string", "check_in_date": "date (YYYY-MM-DD)", "check_out_date": "date (YYYY-MM-DD)" }` | `{ "hotel_id": "string", "room_type_id": "string", "available_rooms": integer }` |
+| addHotel           | POST    | `/api/v1/hotel_reservation/admin/hotel/add` | `{ "hotel_name": "string", "address": "string", "city": "string", "description": "string", "amenities": ["string"], "photos": ["string"] }` | `{ "hotel_id": "string", "status": "string" }` |
+| updateHotelInfo    | PUT     | `/api/v1/hotel_reservation/admin/hotel/update/{hotel_id}` | `{ "hotel_name": "string (optional)", "address": "string (optional)", "city": "string (optional)", "description": "string (optional)", "amenities": ["string (optional)"], "photos": ["string (optional)"] }` | `{ "hotel_id": "string", "status": "string" }` |
+| manageRoomTypes    | POST/PUT| `/api/v1/hotel_reservation/admin/room_types/{hotel_id}` | `[ { "room_type_id": "string (optional for POST)", "room_type_name": "string", "description": "string", "price_per_night": number, "max_guests": integer, "amenities": ["string"], "available_count": integer } ]` | `{ "hotel_id": "string", "status": "string", "updated_room_types": ["string"] }` |
+
+## Database: MySQL
+
+### Tables
+
+#### Hotels
+| Column Name | Data Type | Primary Key | Foreign Key | Indexes |
+|-------------|----------|-------------|-------------|---------|
+| hotel_id   | VARCHAR(255) | YES | - | - |
+| hotel_name | VARCHAR(255) | NO | - | Index on hotel_name, city |
+| address    | TEXT | NO | - | - |
+| city       | VARCHAR(255) | NO | - | Index on city |
+| description | TEXT | NO | - | - |
+| rating     | DECIMAL(2,1) | NO | - | - |
+| amenities  | JSON | NO | - | - |
+| photos     | JSON | NO | - | - |
+
+#### RoomTypes
+| Column Name | Data Type | Primary Key | Foreign Key | Indexes |
+|-------------|----------|-------------|-------------|---------|
+| room_type_id | VARCHAR(255) | YES | - | - |
+| hotel_id | VARCHAR(255) | NO | YES | Index on hotel_id |
+| room_type_name | VARCHAR(255) | NO | - | - |
+| description | TEXT | NO | - | - |
+| price_per_night | DECIMAL(10,2) | NO | - | - |
+| max_guests | INT | NO | - | - |
+| amenities | JSON | NO | - | - |
+| available_count | INT | NO | - | - |
+
+
+#### Reservations
+| Column Name | Data Type | Primary Key | Foreign Key | Indexes |
+|-------------|----------|-------------|-------------|---------|
+| reservation_id | VARCHAR(255) | YES | - | - |
+| user_id | VARCHAR(255) | NO | YES | Index on user_id |
+| hotel_id | VARCHAR(255) | NO | YES | Index on hotel_id |
+| room_type_id | VARCHAR(255) | NO | YES | Index on room_type_id |
+| check_in_date | DATE | NO | - | Index on check_in_date |
+| check_out_date | DATE | NO | - | Index on check_out_date |
+| num_guests | INT | NO | - | - |
+| guest_details | JSON | NO | - | - |
+| status | ENUM('pending', 'confirmed', 'cancelled', 'completed') | NO | - | Index on status |
+| confirmation_number | VARCHAR(255) | NO | - | UNIQUE Index on confirmation_number |
+| cancellation_confirmation | VARCHAR(255) | NO | - | - |
+| refund_amount | DECIMAL(10,2) | NO | - | - |
+| created_at | TIMESTAMP | NO | - | - |
+| updated_at | TIMESTAMP | NO | - | - |
+
+#### RoomAvailability
+| Column Name | Data Type | Primary Key | Foreign Key | Indexes |
+|-------------|----------|-------------|-------------|---------|
+| availability_id | INT AUTO_INCREMENT | YES | - | UNIQUE Index on (hotel_id, room_type_id, date) |
+| hotel_id | VARCHAR(255) | NO | YES | - |
+| room_type_id | VARCHAR(255) | NO | YES | - |
+| date | DATE | NO | - | Index on date |
+| available_rooms | INT | NO | - | - |
+
+#### Users
+| Column Name | Data Type | Primary Key | Foreign Key | Indexes |
+|-------------|----------|-------------|-------------|---------|
+| user_id | VARCHAR(255) | YES | - | - |
+| username | VARCHAR(255) | NO | - | UNIQUE Index on username |
+| email | VARCHAR(255) | NO | - | UNIQUE Index on email |
+| phone_number | VARCHAR(255) | NO | - | UNIQUE Index on phone_number |
+| password_hash | VARCHAR(255) | NO | - | - |
+| payment_info | JSON | NO | - | - |
+
+
+
+
+
+
+
 
 
